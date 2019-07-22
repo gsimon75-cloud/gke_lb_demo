@@ -1,0 +1,71 @@
+-
+    hosts: localhost
+    vars_files:
+        - external_vars.yaml
+    vars:
+        service_account_content: "{{ lookup('file', gcp_cred_file) }}"
+        service_account_email: "{{ service_account_content | json_query('client_email') }}"
+    tags: create
+    tasks:
+        -
+            name: Create a cluster
+            gcp_container_cluster:
+                project: "{{ gcp_project_id }}"
+                auth_kind: serviceaccount
+                service_account_file: "{{ gcp_cred_file }}"
+                name: "{{ cluster_name }}"
+                zone: "{{gcp_zone }}"
+                initial_node_count: 1
+                node_config:
+                    machine_type: g1-small
+                    disk_size_gb: 10
+            register: cluster
+        -
+            name: This is the cluster
+            debug:
+                var: cluster
+        -
+            name: Create the real node pool
+            gcp_container_node_pool:
+                project: "{{ gcp_project_id }}"
+                auth_kind: serviceaccount
+                service_account_file: "{{ gcp_cred_file }}"
+                name: "the-real-pool"
+                zone: "{{gcp_zone }}"
+                cluster: "{{ cluster }}"
+                initial_node_count: 3
+                autoscaling:
+                    enabled: true
+                    min_node_count: 1
+                    max_node_count: 4
+                config:
+                    machine_type: f1-micro
+                    disk_size_gb: 10
+                    metadata:
+                        disable-legacy-endpoints: "true"
+                management:
+                    auto_repair: true
+                    auto_upgrade: true
+                version: 
+            register: node_pool
+        -
+            name: This is the node pool
+            debug:
+                var: node_pool
+        -
+            name: Delete the implicite node pool
+            gcp_container_node_pool:
+                project: "{{ gcp_project_id }}"
+                auth_kind: serviceaccount
+                service_account_file: "{{ gcp_cred_file }}"
+                name: "default-pool"
+                zone: "{{gcp_zone }}"
+                cluster: "{{ cluster }}"
+                initial_node_count:
+                state: absent
+        -
+            name: Fetch cluster credentials for kubectl
+            shell: "gcloud container clusters get-credentials --zone='{{ zone}}' '{{ cluster_name }}"
+
+
+# vim: set sw=4 ts=4 et indk= :
