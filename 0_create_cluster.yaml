@@ -37,15 +37,15 @@
                 autoscaling:
                     enabled: true
                     min_node_count: 1
-                    max_node_count: 4
+                    max_node_count: 6
                 config:
-                    machine_type: f1-micro
+                    machine_type: g1-small
                     disk_size_gb: 10
                     metadata:
                         disable-legacy-endpoints: "true"
                 management:
                     auto_repair: true
-                    auto_upgrade: true
+                    auto_upgrade: false
                 version: 
             register: node_pool
         -
@@ -63,9 +63,20 @@
                 cluster: "{{ cluster }}"
                 initial_node_count:
                 state: absent
-        -
-            name: Fetch cluster credentials for kubectl
-            shell: "gcloud container clusters get-credentials --zone='{{ zone}}' '{{ cluster_name }}"
+#        -
+#            name: Fetch cluster credentials for kubectl
+#            shell: "gcloud container clusters get-credentials --zone='{{ gcp_zone}}' '{{ cluster_name }}'"
+#        -
+#            name: Fetch k8s facts
+#            k8s_facts:
+#                ca_cert: "{{ cluster.masterAuth.clusterCaCertificate }}"
+#                #kubeconfig: "~/.kube/config"
+#                kind: Service
+#            register: services
+#        -
+#            name: These are the services
+#            debug:
+#                var: services
 
 
 # vim: set sw=4 ts=4 et indk= :

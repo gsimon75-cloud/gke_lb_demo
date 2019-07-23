@@ -96,6 +96,13 @@ As of that initial 'minimal pool', GKE also has some peculiar restrictions: if w
 
 We have an Ansible playbook for that: `./run.sh 0_create_cluster.yaml`
 
+A note:
+
+If the script cannot dump the cluster services, but returns a terse *`Unauthorized`* error, then check on the web
+console if the cluster could indeed start up, or is it standing in a 'Pods unschedulable' state.
+
+
+
 
 ### Checking the cluster
 
@@ -116,6 +123,18 @@ To check that we can actually access the cluster: `kubectl cluster-info`
 
 It seems that the time overhead caused by the implicite pool (creating and destroying it) is about 3 minutes.
 That's not negligible, but not insufferable either.
+
+
+### SSL handling of `k8s_facts`
+
+There is a [bug](https://github.com/ansible/ansible/issues/56640), it was [fixed](https://github.com/ansible/ansible/pull/57418),
+but as of now, 2.8 is the latest stable and it doesn't have the fix.
+
+
+The fix was merged in on Jun 5, 2019. '2.8.1' was released on Jun 7 but it doesn't have the fix, '2.8.2' neither.
+'devel' has it, so probably it'll be released in '2.8.3'.
+
+Until then, apply [this](https://github.com/ansible/ansible/issues/56640#issuecomment-496526804) workaround.
 
 
 ### Contents of `~/.kube/config`
@@ -150,3 +169,30 @@ users:
         token-key: '{.credential.access_token}'
       name: gcp
 ```
+
+So the actual auth credentials are provided by `gcloud config config-helper --format=json`, which produces
+
+```
+{
+  "configuration": {
+    "active_configuration": "default",
+    "properties": {
+      "core": {
+        "account": "...@....",
+        "disable_usage_reporting": "True",
+        "project": "networksandbox-232012"
+      }
+    }
+  },
+  "credential": {
+    "access_token": "...",
+    "token_expiry": "2019-07-23T10:54:19Z"
+  },
+  "sentinels": {
+    "config_sentinel": ".../.config/gcloud/config_sentinel"
+  }
+}
+```
+
+I would've liked to skip generating this `~/.kube/config.json` and keep the credentials within
+the ansible session, but it seems I can't avoid it.

@@ -1,0 +1,45 @@
+-
+    hosts: localhost
+    vars_files:
+        - external_vars.yaml
+    vars:
+        service_account_content: "{{ lookup('file', gcp_cred_file) }}"
+        service_account_email: "{{ service_account_content | json_query('client_email') }}"
+        gcloud_creds_text: "{{ lookup('pipe', 'gcloud config config-helper --format=json') }}"
+        gcloud_credentials: "{{ gcloud_creds_text | json_query('@') }}"
+    tags: create
+    tasks:
+#        -
+#            name: These are the gcloud credentials
+#            debug:
+#                var: gcloud_credentials
+        -
+            name: Gather cluster facts
+            gcp_container_cluster_facts:
+                project: "{{ gcp_project_id }}"
+                auth_kind: serviceaccount
+                service_account_file: "{{ gcp_cred_file }}"
+                zone: "{{gcp_zone }}"
+            register: clusters
+        -
+            set_fact:
+                cluster: "{{ clusters['items'] | selectattr('name', 'match', cluster_name) | first  }}"
+        -
+            name: This is the cluster
+            debug:
+                var: cluster
+        -
+            name: Fetch k8s facts
+            k8s_facts:
+                host: "https://{{ cluster.endpoint }}"
+                ca_cert: "{{ cluster.masterAuth.clusterCaCertificate }}"
+                #validate_certs: false
+                api_key: "{{ gcloud_credentials.credential.access_token }}"
+                kind: Service
+            register: services
+        -
+            name: These are the services
+            debug:
+                var: services
+
+# vim: set sw=4 ts=4 et indk= :
