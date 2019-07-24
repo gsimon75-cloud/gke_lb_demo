@@ -1,0 +1,56 @@
+-
+    hosts: localhost
+    vars_files:
+        - external_vars.yaml
+    vars:
+        service_account_content: "{{ lookup('file', gcp_cred_file) }}"
+        service_account_email: "{{ service_account_content | json_query('client_email') }}"
+        gcloud_creds_text: "{{ lookup('pipe', 'gcloud config config-helper --format=json') }}"
+        gcloud_credentials: "{{ gcloud_creds_text | json_query('@') }}"
+    tags: create
+    tasks:
+        -
+            name: Pull the mariadb/server image
+            become: true
+            docker_image:
+                name: "mariadb/server"
+                source: pull
+                build:
+                    pull: true
+            register: orig_image
+        -
+            name: This is the original image
+            become: true
+            debug:
+                var: orig_image
+        -
+            name: Log previous sessions out of container repo
+            become: true
+            docker_login:
+                registry_url: "https://{{ container_repo_server }}"
+                state: absent
+        -
+            name: Log in to container repo
+            become: true
+            docker_login:
+                registry_url: "https://{{ container_repo_server }}"
+                username: "_dcgcloud_token"
+                password: "{{ gcloud_credentials.credential.access_token }}"
+        -
+            name: Tag and push the image to the container repo
+            become: true
+            docker_image:
+                name: "mariadb/server"
+                repository: "{{ container_repo_server }}/{{ gcp_project_id }}/mariadb/server"
+                source: local
+                push: true
+                build:
+                    push: true
+        -
+            name: Log out of container repo
+            become: true
+            docker_login:
+                registry_url: "https://{{ container_repo_server }}"
+                state: absent
+
+# vim: set sw=4 ts=4 et indk= :

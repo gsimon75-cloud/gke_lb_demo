@@ -63,20 +63,5 @@
                 cluster: "{{ cluster }}"
                 initial_node_count:
                 state: absent
-#        -
-#            name: Fetch cluster credentials for kubectl
-#            shell: "gcloud container clusters get-credentials --zone='{{ gcp_zone}}' '{{ cluster_name }}'"
-#        -
-#            name: Fetch k8s facts
-#            k8s_facts:
-#                ca_cert: "{{ cluster.masterAuth.clusterCaCertificate }}"
-#                #kubeconfig: "~/.kube/config"
-#                kind: Service
-#            register: services
-#        -
-#            name: These are the services
-#            debug:
-#                var: services
-
 
 # vim: set sw=4 ts=4 et indk= :
