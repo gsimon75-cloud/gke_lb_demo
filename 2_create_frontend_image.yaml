@@ -41,7 +41,7 @@
             become: true
             docker_image:
                 name: "mariadb/server"
-                repository: "{{ container_repo_server }}/{{ gcp_project_id }}/mariadb/server"
+                repository: "{{ container_repo_server }}/{{ gcp_project_id }}/mariadb_server"
                 source: local
                 push: true
                 build:

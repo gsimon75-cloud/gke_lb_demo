@@ -140,22 +140,36 @@ NOTE: This `~/.kube/config` is only needed for `kubectl`, as the playbooks acces
 
 ## Deploying MariaDB
 
+First of all, we need a persistent disk that will store all our data, and it shall be initialised to contain the
+(empty) database files.
+
+1. Create the disk
+2. Create a temporary VM, attach the disk, create filesystem on it
+3. Mount it to `/var/lib/mysql`
+4. Install `mariadb-server` and `mariadb`
+5. Execute the db creation scripts
+6. Shut down and destroy the VM
+
+
+
+
+
+
+
+
+## Deploying the webservers
+
 ### The container image
 
-GKE has its own [container registries](https://cloud.google.com/container-registry/docs/managing) like `gcr.io`,
-`eu.gcr.io`, `asia.gcr.io`, `k8s.gcr.io`, even `mirror.gcr.io` that
-[mirrors](https://cloud.google.com/container-registry/docs/using-dockerhub-mirroring) *some* of the Docker Hub
-images.
-
-`mariadb/server` is not among them, so we'll have to copy it to our own project-scope registry: pull from the original
-registry, tag it, and push it to our registry.
+The frontend is a standalone web application with our specific code and content, so we must create an image
+for it.
 
 To push a local image to a GSE storage, the [officially recommended way](https://cloud.google.com/container-registry/docs/pushing-and-pulling)
 is to do it via `docker`:
 
-1. Pull the original image: `docker pull mariadb/server`
-2. Add a tag that refers to our project registry: `docker tag mariadb/server eu.gcr.io/networksandbox-232012/mariadb/server`
-3. Push the image: `docker push eu.gcr.io/networksandbox-232012/mariadb/server`
+1. Create our local image somehow
+2. Add a tag that refers to our project registry: `docker tag lb_demo_frontend eu.gcr.io/networksandbox-232012/lb_demo_frontend`
+3. Push the image: `docker push eu.gcr.io/networksandbox-232012/lb_demo_frontend`
 
 Pushing needs some credentials, so the documentation recommends configuring `docker` to use `gcloud` as a credential
 store: `gcloud auth configure-docker --quiet`, but **DON'T** do it yet. It wouldn't work as expected, so we'll have a
@@ -227,17 +241,17 @@ playbook uses that one.
 
 ### Summary
 
-1. Pull the original image: `sudo docker pull mariadb/server`
-2. Add a tag that refers to our project registry: `sudo docker tag mariadb/server eu.gcr.io/networksandbox-232012/mariadb/server`
+1. Create the frontend image
+2. Add a tag that refers to our project registry: `sudo docker tag lb_demo_frontend eu.gcr.io/networksandbox-232012/lb_demo_frontend`
 3. Logout any previous logins: `sudo docker logout eu.gcr.io`
 4. Get a fresh token: `echo "https://eu.gcr.io" | gcloud auth docker-helper get`
 5. Login to the server: `sudo docker login -u "_dcgcloud_token" -p "..." eu.gcr.io`
-6. Push the image: `docker push eu.gcr.io/networksandbox-232012/mariadb/server`
+6. Push the image: `docker push eu.gcr.io/networksandbox-232012/lb_demo_frontend`
 7. Logout: `sudo docker logout eu.gcr.io`
 
-This is done by `1_clone_mariadb_image.yaml`, and then its result can be checked: 
+This is done by `2_create_frontend_image.yaml`, and then its result can be checked: 
 
-`gcloud container images list --repository=eu.gcr.io/networksandbox-232012/mariadb`
+`gcloud container images list --repository=eu.gcr.io/networksandbox-232012`
 
 
 ## Misc notes
