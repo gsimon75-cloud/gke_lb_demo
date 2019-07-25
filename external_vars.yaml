@@ -9,4 +9,6 @@ cluster_name: "lb-demo-cluster"
 
 container_repo_server: "eu.gcr.io"
 
+db_disk_name: "lb-demo-db"
+
 # vim: set sw=4 ts=4 et indk= :

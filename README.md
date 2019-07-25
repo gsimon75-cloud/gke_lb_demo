@@ -145,11 +145,11 @@ First of all, we need a persistent disk that will store all our data, and it sha
 
 1. Create the disk
 2. Create a temporary VM, attach the disk, create filesystem on it
-3. Mount it to `/var/lib/mysql`
-4. Install `mariadb-server` and `mariadb`
-5. Execute the db creation scripts
-6. Shut down and destroy the VM
+3. Shut down and destroy the VM
 
+4. Deploy the MariaDB to the cluster: `kubectl create -f 3_mariadb_deployment.kube.yaml`
+
+...
 
 
 

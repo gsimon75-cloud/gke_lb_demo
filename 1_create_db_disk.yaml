@@ -1,0 +1,101 @@
+-
+    hosts: localhost
+    vars_files:
+        - external_vars.yaml
+    tags: create
+    tasks:
+        -
+            name: Create persistent disk for DB content
+            gcp_compute_disk:
+                project: "{{ gcp_project_id }}"
+                auth_kind: serviceaccount
+                service_account_file: "{{ gcp_cred_file }}"
+                name: "{{ db_disk_name }}"
+                zone: "{{ gcp_zone }}"
+                type: "pd-standard"
+                size_gb: 10
+            register: db_disk
+        -
+            name: Create the temporary DB instance
+            gcp_compute_instance:
+                project: "{{ gcp_project_id }}"
+                auth_kind: serviceaccount
+                service_account_file: "{{ gcp_cred_file }}"
+                name: "{{ cluster_name }}-db-temp"
+                zone: "{{ gcp_zone }}"
+                machine_type: "f1-micro"
+                status: RUNNING
+                disks:
+                    -
+                        boot: true
+                        auto_delete: true
+                        initialize_params:
+                            source_image: "projects/centos-cloud/global/images/family/centos-7"
+                    -
+                        boot: false
+                        auto_delete: false
+                        device_name: "db-disk"
+                        source: "{{ db_disk }}"
+                network_interfaces:
+                    -
+                        access_configs:
+                            -
+                                name: External NAT
+                                type: ONE_TO_ONE_NAT
+                                #nat_ip: ...
+            register: db_instance
+        -
+            name: This is the DB instance
+            debug:
+                var: db_instance
+        -
+            name: Wait for SSH
+            wait_for: "port=22 host={{ db_instance.networkInterfaces[0].accessConfigs[0].natIP }} delay=10 state=started timeout=60"
+            delegate_to: 127.0.0.1
+        -
+            meta: refresh_inventory
+-
+    hosts: [ dbserver ]
+    vars_files:
+        - external_vars.yaml
+    tags: install
+    tasks:
+        -
+            name: Prepare the disk
+            become: yes
+            vars:
+                disk: /dev/disk/by-id/google-db-disk
+            shell: "mkfs.ext3 -F -L 'db-disk' {{ disk }}"
+        -
+            name: Shut down the instance
+            become: yes
+            shell: "sleep 2 && /sbin/shutdown -c && /sbin/shutdown -h now"
+            async: 1
+            poll: 0
+        -
+            name: Wait to go down
+            gcp_compute_instance:
+                project: "{{ gcp_project_id }}"
+                auth_kind: serviceaccount
+                service_account_file: "{{ gcp_cred_file }}"
+                name: "{{ cluster_name }}-db-temp"
+                zone: "{{ gcp_zone }}"
+                status: TERMINATED
+            delegate_to: 127.0.0.1
+-
+    hosts: localhost
+    vars_files:
+        - external_vars.yaml
+    tasks:
+        -
+            name: Destroy the DB server instance
+            gcp_compute_instance:
+                project: "{{ gcp_project_id }}"
+                auth_kind: serviceaccount
+                service_account_file: "{{ gcp_cred_file }}"
+                name: "{{ cluster_name }}-db-temp"
+                zone: "{{ gcp_zone }}"
+                machine_type: 
+                state: absent
+
+# vim: set sw=4 ts=4 et indk= :
