@@ -85,8 +85,9 @@ the plural) belong to a Cluster. In fact, the Cluster adds very little extra to 
 And there is a small limitation here, that causes some inconvenience for us.
 
 Creating a Cluster involves storing a lot of information in its Pools, so we can't create a Cluster without a (default)
-Pool. But as of the current state of the APIs, not all Pool parameters can be configured when creating the Cluster, so
-we've got a chicken-and-egg problem here.
+Pool. But as of the current state of the Ansible module `gcp_container_cluster`, not all Pool parameters can be
+configured through it. But we can't create the Pool first, without the Cluster, so we've got a chicken-and-egg problem
+here.
 
 As of now, the only solution seems to
 * Create the Cluster with a minimal Pool
@@ -98,7 +99,7 @@ marks the `nodeConfig` and `initialNodeCount` fields of the Cluster as obsoleted
 Pool as part of the Cluster specification (`nodePools[]`), but with the full specification model as any Pools that we
 would add afterwards.
 
-So, this is an Ansible limitation, because the latest changes of the GKE API hasn't yet been tracked to the
+So, this is an Ansible limitation, the latest changes of the GKE API hasn't yet been tracked to the
 corresponding module [`gcp_container_cluster`](https://github.com/ansible/ansible/blob/8074fa9a3e388072416238aeeac8eab524442dbd/lib/ansible/modules/cloud/google/gcp_container_cluster.py#L719).
 ([Others](https://serverfault.com/questions/822787/create-google-container-engine-cluster-without-default-node-pool/823938)
 have also run into this problem, only at that time the new GKE API may not have existed yet.)
@@ -109,7 +110,7 @@ As of that initial 'minimal pool', GKE also has some peculiar restrictions: if w
 
 #### Note #1
 
-If the script cannot dump the cluster services, but returns a terse *`Unauthorized`* error, then check on the web
+If the script cannot dump the cluster services, but returns a terse `Unauthorized` error, then check on the web
 console if the cluster could indeed start up, or is it standing in a 'Pods unschedulable' state.
 
 #### Note #2
@@ -156,11 +157,12 @@ is to do it via `docker`:
 2. Add a tag that refers to our project registry: `docker tag mariadb/server eu.gcr.io/networksandbox-232012/mariadb/server`
 3. Push the image: `docker push eu.gcr.io/networksandbox-232012/mariadb/server`
 
-Pushing needs some credentials, so the documentation recommendsx configuring `docker` to use `gcloud` as a credential
+Pushing needs some credentials, so the documentation recommends configuring `docker` to use `gcloud` as a credential
 store: `gcloud auth configure-docker --quiet`, but **DON'T** do it yet. It wouldn't work as expected, so we'll have a
 workaround and therefore we won't need it.
 
-(Btw, this command would just create/update `~/.docker/config.json` with `{ "credHelpers": { "gcr.io": "gcloud", ... }`.)
+(Btw, this command would just create/update `~/.docker/config.json` with `{ "credHelpers": { "gcr.io": "gcloud", ... }`,
+so it's not dealing with the credentials, it only configures how to get them.)
 
 
 ### `docker` as non-root
@@ -172,7 +174,7 @@ There is a [doc](https://docs.docker.com/install/linux/linux-postinstall/) on ho
 non-root users, and there is [another doc](https://docs.docker.com/engine/security/security/#docker-daemon-attack-surface)
 about why not to do it.
 
-Startin from Centos 7, the OS-supported `docker` packages follow the 'root-only' discipline and tell that if you want to
+Starting from Centos 7, the OS-supported `docker` packages follow the 'root-only' discipline and tell that if you want to
 make `docker` available for non-root users, then configure `sudo` for them, because it's at least audited, while the
 implicit (and needed) root-exec abilities of `docker` aren't.
 
@@ -186,9 +188,9 @@ If we told `gcloud` to tell `docker` to use `gcloud` as credential source (that 
 above), it would create/update the `.docker/config.json` in **our** home folder.
 
 Then when we'd say `sudo docker push ...`, the `docker` command would run as root and use the home folder of root, and
-thus wouldn't see **our** `config.json`.
+thus wouldn't even consider **our** `config.json`.
 
-That could even be circumvented by telling `docker` where to look for its config: `sudo docker --config "$HOME/.docker" push ...`,
+This could be circumvented by telling `docker` where to look for its config: `sudo docker --config "$HOME/.docker" push ...`,
 and it *almost* works. Almost...
 
 The docker client can connect to the socket, talk to the docker daemon, prepare the images to send, but then it fails:
@@ -199,27 +201,28 @@ The problem is this:
 
 1. `docker push` is running as root
 2. It starts talking with the GSE server, reaches the authentication phase
-3. Calls out to `gcloud` for credentials **still as root**
-4. `gcloud` is also running as root
+3. Calls out to `gcloud` for credentials, **still as root**
+4. So `gcloud` is also running as root
 5. It tries to get its active config and such information from `~/.config/gcloud/`
-6. That **refers to the home folder of root**
+6. That refers to the home folder of root, and **not to ours**
 7. There certainly are no credentials for our logged-in service account
 
-(It took about two hours of following the scripts and tracing `docker` with `strace`, but finally managed to catch it :D !)
+(It took about two hours of debugging the scripts and tracing `docker` with `strace`, but finally managed to catch it :D !)
 
 
 ### The solution
 
-What `docker` does when asking `gcloud` for credentials is like this: `echo "https://eu.gcr.io" | gcloud auth docker-helper get`,
+What `docker` actually does when asking `gcloud` for credentials is like this: `echo "https://eu.gcr.io" | gcloud auth docker-helper get`,
 and expects the credentials in .json format: `{ "Secret": "...", "Username": "_dcgcloud_token" }`
 
-That is the username and password `docker` shall use to access the server `eu.gcr.io`, so we may as well login
+That is the username and password `docker` uses to access the server `eu.gcr.io`, so we may as well login
 there with these credentials: `sudo docker login -u "_dcgcloud_token" -p "..." eu.gcr.io`.
 
-The token has a limited validity period, so it should be performed right before the `sudo docker push ...`, and then
-we can log out as well: `sudo docker logout https://eu.gcr.io`
+The token has a limited validity period, so it should be performed right before the `sudo docker push ...`, but then
+all the `sudo docker ...` commands work fine, and finally we can log out as well: `sudo docker logout https://eu.gcr.io`
 
-NOTE: This token is the same as what's in the structure returned by `gcloud config config-helper --format=json`.
+NOTE: This token is the same as that in the structure returned by `gcloud config config-helper --format=json`, so the
+playbook uses that one.
 
 
 ### Summary
@@ -252,10 +255,8 @@ That's not negligible, but not insufferable either.
 ### SSL handling of `k8s_facts`
 
 There is a [bug](https://github.com/ansible/ansible/issues/56640), it was [fixed](https://github.com/ansible/ansible/pull/57418),
-but as of now, 2.8 is the latest stable and it doesn't have the fix.
-
-The fix was merged in on Jun 5, 2019. '2.8.1' was released on Jun 7 but it doesn't have the fix, '2.8.2' neither.
-'devel' has it, so probably it'll be released in '2.8.3'.
+the fix was merged in on Jun 5, 2019. '2.8.1' was released on Jun 7 but it doesn't have the fix, neither does '2.8.2',
+so probably it'll be released in '2.8.3'.
 
 Until then, apply [this](https://github.com/ansible/ansible/issues/56640#issuecomment-496526804) workaround.
 
@@ -316,3 +317,5 @@ So the actual auth credentials are provided by `gcloud config config-helper --fo
   }
 }
 ```
+
+That `access_token` is the same as the one returned by `echo "https://gcr.io" | gcloud auth docker-helper get`
