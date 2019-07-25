@@ -72,5 +72,43 @@
                                         gcePersistentDisk:
                                             pdName: lb-demo-db
                                             fsType: ext3
+            register: deployment
+        -
+            name: This is the deployment
+            debug:
+                var: deployment
+        -
+            name: Create a MariaDB service
+            k8s:
+                host: "https://{{ cluster.endpoint }}"
+                ca_cert: "{{ cluster.masterAuth.clusterCaCertificate }}"
+                #validate_certs: false
+                api_key: "{{ gcloud_credentials.credential.access_token }}"
+                namespace: "default"
+                definition:
+                    apiVersion: v1
+                    kind: Service
+                    metadata:
+                        name: mariadb-server
+                        labels:
+                            app: mariadb
+                            role: master
+                            tier: backend
+                    spec:
+                        type: LoadBalancer
+                        #loadBalancerIP: "YOUR.IP.ADDRESS.HERE"
+                        ports:
+                        -
+                            port: 3306
+                            targetPort: 3306
+                        selector:
+                            app: mariadb
+                            role: master
+                            tier: backend
+            register: service
+        -
+            name: This is the service
+            debug:
+                var: service
 
 # vim: set sw=4 ts=4 et indk= :

@@ -147,11 +147,30 @@ First of all, we need a persistent disk that will store all our data, and it sha
 2. Create a temporary VM, attach the disk, create filesystem on it
 3. Shut down and destroy the VM
 
-4. Deploy the MariaDB to the cluster: `kubectl create -f 3_mariadb_deployment.kube.yaml`
+4. Deploy the MariaDB to the cluster: `kubectl create -f 2_mariadb_deployment.kube.yaml`
 
 ...
 
+TODO: add to playbook
 
+5. Wait until the external IP of the service gets assigned (1 < x < 7 minutes)
+
+```
+$ kubectl get service mariadb-server
+NAME             TYPE           CLUSTER-IP      EXTERNAL-IP   PORT(S)          AGE
+mariadb-server   LoadBalancer   10.19.246.185   <pending>     3306:32719/TCP   14s
+```
+
+vs. 
+```
+$ kubectl get service mariadb-server
+NAME             TYPE           CLUSTER-IP      EXTERNAL-IP     PORT(S)          AGE
+mariadb-server   LoadBalancer   10.19.246.185   130.211.63.47   3306:32719/TCP   11m
+```
+
+then
+
+`mysql -u root --password="$(<db.password)" -h 130.211.63.47`
 
 
 
