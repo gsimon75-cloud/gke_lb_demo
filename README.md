@@ -170,7 +170,7 @@ mariadb-server   LoadBalancer   10.19.246.185   130.211.63.47   3306:32719/TCP  
 
 then
 
-`mysql -u root --password="$(<db.password)" -h 130.211.63.47`
+`mysql -u root --password="$(<db.root.password)" -h 130.211.63.47`
 
 
 

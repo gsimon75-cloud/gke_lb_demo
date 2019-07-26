@@ -5,6 +5,9 @@ gcp_cred_file: "service_account.json"
 ansible_user: "prov"
 ansible_ssh_public_key_file: "provisioner.openssh.pub"
 
+app_name: "Vue_MySQL_Example"
+app_repo: "https://github.com/gsimon75-web/Vue_MySQL_Example.git"
+
 cluster_name: "lb-demo-cluster"
 
 container_repo_server: "eu.gcr.io"

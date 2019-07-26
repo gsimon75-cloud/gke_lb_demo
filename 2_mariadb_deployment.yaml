@@ -3,7 +3,8 @@
     vars_files:
         - external_vars.yaml
     vars:
-        db_password: "{{ lookup('password', 'db.password') }}"
+        db_root_password: "{{ lookup('password', 'db.root.password') }}"
+        db_user_password: "{{ lookup('password', 'db.user.password') }}"
         gcloud_creds_text: "{{ lookup('pipe', 'gcloud config config-helper --format=json') }}"
         gcloud_credentials: "{{ gcloud_creds_text | json_query('@') }}"
     tags: create
@@ -54,7 +55,7 @@
                                         env:
                                             -
                                                 name: "MARIADB_ROOT_PASSWORD"
-                                                value: "{{ db_password }}"
+                                                value: "{{ db_root_password }}"
                                         resources:
                                             requests:
                                                 cpu: 100m
@@ -110,5 +111,53 @@
             name: This is the service
             debug:
                 var: service
+        -
+            name: Check out the App sources
+            git:
+                repo: "{{ app_repo }}"
+                dest: "{{ app_name }}"
+                force: true
+        -
+            name: Modify the login source in DB creation script
+            replace:
+                path: "{{ app_name }}/sql/00_create.sql"
+                regexp: "(?<=@')[1-9][^']*"
+                replace: "%"
+        -
+            name: Modify the user password in DB creation script
+            replace:
+                path: "{{ app_name }}/sql/00_create.sql"
+                regexp: "(?<=IDENTIFIED BY ')[^']*"
+                replace: "{{ db_user_password }}"
+        -
+            name: Wait for the service external IP
+            k8s_facts:
+                host: "https://{{ cluster.endpoint }}"
+                ca_cert: "{{ cluster.masterAuth.clusterCaCertificate }}"
+                #validate_certs: false
+                api_key: "{{ gcloud_credentials.credential.access_token }}"
+                kind: Service
+                field_selectors:
+                    - metadata.name=mariadb-server
+            register: services
+            until: "services.resources[0].status.loadBalancer.ingress[0].ip is defined"
+            retries: 90
+            delay: 5
+        -
+            set_fact:
+                db_service_ip: "{{ services.resources[0].status.loadBalancer.ingress[0].ip }}"
+        -
+            name: This is the DB service IP
+            debug:
+                var: db_service_ip
+        -
+            name: Create the database structure
+            become: yes
+            shell: |
+                mysql -u root --password='{{ db_root_password }}' -h {{ db_service_ip }} < 00_create.sql
+                mysql -u test --password='{{ db_user_password }}' -h {{ db_service_ip }} < 01_add_data.sql
+            args:
+                chdir: "{{ app_name }}/sql"
+
 
 # vim: set sw=4 ts=4 et indk= :

@@ -20,7 +20,5 @@ compose:
     ansible_host: networkInterfaces[0].accessConfigs[0].natIP
     ansible_user: "'prov'"
     ansible_ssh_private_key_file: "'provisioner.pem'"
-    project_name: "'Vue_MySQL_Example'"
-    project_repo: "'https://github.com/gsimon75-web/Vue_MySQL_Example.git'"
 
 # vim: set sw=4 ts=4 et:

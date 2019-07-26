@@ -16,7 +16,7 @@
                 size_gb: 10
             register: db_disk
         -
-            name: Create the temporary DB instance
+            name: Create a temporary instance
             gcp_compute_instance:
                 project: "{{ gcp_project_id }}"
                 auth_kind: serviceaccount
@@ -88,7 +88,7 @@
         - external_vars.yaml
     tasks:
         -
-            name: Destroy the DB server instance
+            name: Destroy the temporary instance
             gcp_compute_instance:
                 project: "{{ gcp_project_id }}"
                 auth_kind: serviceaccount
