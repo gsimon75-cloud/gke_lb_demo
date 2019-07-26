@@ -40,6 +40,9 @@ clusters created yet. (We'll change that soon :) ...)
 
 We'll need to manipulate Docker images, so Docker must be installed, enabled and started.
 
+The docker in the CentOS repo is way too obsolete (as of now: 1.13.1), so [install](https://docs.docker.com/install/linux/docker-ce/centos/#install-using-the-repository)
+the latest stable (as of now: 19.03.1) from the Docker repo instead.
+
 
 ### OS packages
 
@@ -147,33 +150,23 @@ First of all, we need a persistent disk that will store all our data, and it sha
 2. Create a temporary VM, attach the disk, create filesystem on it
 3. Shut down and destroy the VM
 
-4. Deploy the MariaDB to the cluster: `kubectl create -f 2_mariadb_deployment.kube.yaml`
+This is done by `1_create_db_disk.yaml`.
 
-...
+4. Generate random passwords for the (soon to be created) root and app users of the DB
+5. Deploy the MariaDB to the cluster (see the embedded resource definition in the .yaml)
+6. Create the MariaDB service
+7. Check out the App sources (to have the DB setup .sql scripts)
+8. Customise the DB setup scripts and the Frontend configs
+9. Remotely access the DB service and execute the DB setup scripts
 
-TODO: add to playbook
+This is done by `2_mariadb_deployment.yaml`
 
-5. Wait until the external IP of the service gets assigned (1 < x < 7 minutes)
-
-```
-$ kubectl get service mariadb-server
-NAME             TYPE           CLUSTER-IP      EXTERNAL-IP   PORT(S)          AGE
-mariadb-server   LoadBalancer   10.19.246.185   <pending>     3306:32719/TCP   14s
-```
-
-vs. 
-```
-$ kubectl get service mariadb-server
-NAME             TYPE           CLUSTER-IP      EXTERNAL-IP     PORT(S)          AGE
-mariadb-server   LoadBalancer   10.19.246.185   130.211.63.47   3306:32719/TCP   11m
-```
-
-then
-
-`mysql -u root --password="$(<db.root.password)" -h 130.211.63.47`
+NOTE: It may take some time (even minutes) until the service gets its external IP assigned, see in the output of `kubectl get service mariadb-server`
 
 
+The randomly generated passwords are stored in the local files `db.root.password` and `db.user.password`, so if we want to check the DB service manually, we can connect to it:
 
+`mysql -u root --password="$(<db.root.password)" -h <the service external IP address>`
 
 
 ## Deploying the webservers
@@ -186,7 +179,7 @@ for it.
 To push a local image to a GSE storage, the [officially recommended way](https://cloud.google.com/container-registry/docs/pushing-and-pulling)
 is to do it via `docker`:
 
-1. Create our local image somehow
+1. Create our local image
 2. Add a tag that refers to our project registry: `docker tag lb_demo_frontend eu.gcr.io/networksandbox-232012/lb_demo_frontend`
 3. Push the image: `docker push eu.gcr.io/networksandbox-232012/lb_demo_frontend`
 
@@ -196,7 +189,6 @@ workaround and therefore we won't need it.
 
 (Btw, this command would just create/update `~/.docker/config.json` with `{ "credHelpers": { "gcr.io": "gcloud", ... }`,
 so it's not dealing with the credentials, it only configures how to get them.)
-
 
 ### `docker` as non-root
 
@@ -211,11 +203,13 @@ Starting from Centos 7, the OS-supported `docker` packages follow the 'root-only
 make `docker` available for non-root users, then configure `sudo` for them, because it's at least audited, while the
 implicit (and needed) root-exec abilities of `docker` aren't.
 
-At first glance there isn't too much difference between `docker whatever` and `sudo docker whatever`, and for the `pull`
-and `tag` commands it indeed would work. For the `push`, however, it wouldn't.
+At first glance there isn't too much difference between `docker whatever` and `sudo docker whatever`, and for those
+commands that don't access the GSE repo (eg. `pull`, `build`, `tag`) it indeed works.
+
+For the `push`, however, it wouldn't, because the credential handling isn't working across `sudo`.
 
 
-### `docker` vs. `gcloud`
+### Credentials: `docker` vs. `gcloud`
 
 If we told `gcloud` to tell `docker` to use `gcloud` as credential source (that `gcloud auth configure-docker`
 above), it would create/update the `.docker/config.json` in **our** home folder.
@@ -257,10 +251,9 @@ all the `sudo docker ...` commands work fine, and finally we can log out as well
 NOTE: This token is the same as that in the structure returned by `gcloud config config-helper --format=json`, so the
 playbook uses that one.
 
+So, the process goes like this:
 
-### Summary
-
-1. Create the frontend image
+1. Create the frontend image (see details below)
 2. Add a tag that refers to our project registry: `sudo docker tag lb_demo_frontend eu.gcr.io/networksandbox-232012/lb_demo_frontend`
 3. Logout any previous logins: `sudo docker logout eu.gcr.io`
 4. Get a fresh token: `echo "https://eu.gcr.io" | gcloud auth docker-helper get`
@@ -271,6 +264,13 @@ playbook uses that one.
 This is done by `2_create_frontend_image.yaml`, and then its result can be checked: 
 
 `gcloud container images list --repository=eu.gcr.io/networksandbox-232012`
+
+
+### Creating the frontend image
+
+TODO: do it from playbook
+
+`sudo docker image build -t frontend:latest .`
 
 
 ## Misc notes

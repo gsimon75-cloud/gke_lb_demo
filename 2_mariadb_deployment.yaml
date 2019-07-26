@@ -118,17 +118,29 @@
                 dest: "{{ app_name }}"
                 force: true
         -
-            name: Modify the login source in DB creation script
+            name: Modify the login source in the DB creation script
             replace:
                 path: "{{ app_name }}/sql/00_create.sql"
                 regexp: "(?<=@')[1-9][^']*"
                 replace: "%"
         -
-            name: Modify the user password in DB creation script
+            name: Modify the user password in the DB creation script
             replace:
                 path: "{{ app_name }}/sql/00_create.sql"
                 regexp: "(?<=IDENTIFIED BY ')[^']*"
                 replace: "{{ db_user_password }}"
+        -
+            name: Modify the DB server in the frontend config
+            replace:
+                path: "{{ app_name }}/config.json"
+                regexp: '(?<="db_server":)\s*".*?"'
+                replace: ' "mariadb-server"'
+        -
+            name: Modify the user password in the frontend config
+            replace:
+                path: "{{ app_name }}/config.json"
+                regexp: '(?<="db_password":)\s*".*?"'
+                replace: ' "{{ db_user_password }}"'
         -
             name: Wait for the service external IP
             k8s_facts:
