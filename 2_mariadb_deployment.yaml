@@ -164,7 +164,7 @@
                 var: db_service_ip
         -
             name: Create the database structure
-            become: yes
+            become: true
             shell: |
                 mysql -u root --password='{{ db_root_password }}' -h {{ db_service_ip }} < 00_create.sql
                 mysql -u test --password='{{ db_user_password }}' -h {{ db_service_ip }} < 01_add_data.sql

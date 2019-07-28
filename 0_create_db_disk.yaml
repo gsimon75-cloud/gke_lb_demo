@@ -62,13 +62,13 @@
     tasks:
         -
             name: Prepare the disk
-            become: yes
+            become: true
             vars:
                 disk: /dev/disk/by-id/google-db-disk
             shell: "mkfs.ext3 -F -L 'db-disk' {{ disk }}"
         -
             name: Shut down the instance
-            become: yes
+            become: true
             shell: "sleep 2 && /sbin/shutdown -c && /sbin/shutdown -h now"
             async: 1
             poll: 0
