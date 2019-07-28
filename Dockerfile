@@ -18,7 +18,8 @@ WORKDIR /$app
 COPY $app/server.sh $app/server_launcher.js $app/rest.js $app/rest_Ansehen.js $app/rest_Kunde.js $app/rest_Wohnung.js $app/config.json ./
 COPY --from=builder /$app/public/font public/font
 COPY --from=builder /$app/public/*.js /$app/public/*.html public/
+COPY --from=builder /$app/node_modules node_modules
 EXPOSE 8080/tcp
-ENTRYPOINT ["/bin/bash", "-c", "/Vue_MySQL_Example/server.sh", "start"]
+ENTRYPOINT ["/usr/local/bin/node", "server_launcher.js", "-p", "/tmp/qwer.pid", "-F"]
 
 #$ docker image build -t frontend:latest .

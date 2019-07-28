@@ -3,8 +3,6 @@
     vars_files:
         - external_vars.yaml
     vars:
-        db_root_password: "{{ lookup('password', 'db.root.password') }}"
-        db_user_password: "{{ lookup('password', 'db.user.password') }}"
         gcloud_creds_text: "{{ lookup('pipe', 'gcloud config config-helper --format=json') }}"
         gcloud_credentials: "{{ gcloud_creds_text | json_query('@') }}"
     tags: create
@@ -21,7 +19,7 @@
             set_fact:
                 cluster: "{{ clusters['items'] | selectattr('name', 'match', cluster_name) | first  }}"
         -
-            name: Create a MariaDB deployment
+            name: Create a Frontend deployment
             k8s:
                 host: "https://{{ cluster.endpoint }}"
                 ca_cert: "{{ cluster.masterAuth.clusterCaCertificate }}"
@@ -32,54 +30,40 @@
                     apiVersion: apps/v1
                     kind: Deployment
                     metadata:
-                        name: mariadb-server
+                        name: frontend-server
                     spec:
                         replicas: 1
                         selector:
                             matchLabels:
-                                app: mariadb
+                                app: "{{ app_name }}"
                                 role: master
-                                tier: backend
+                                tier: frontend
                         template:
                             metadata:
                                 labels:
-                                    app: mariadb
+                                    app: "{{ app_name }}"
                                     role: master
-                                    tier: backend
+                                    tier: frontend
                             spec:
                                 containers:
                                     -
                                         # https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.11/#container-v1-core
-                                        name: db
-                                        image: mariadb/server
-                                        env:
-                                            -
-                                                name: "MARIADB_ROOT_PASSWORD"
-                                                value: "{{ db_root_password }}"
+                                        name: frontend
+                                        image: eu.gcr.io/networksandbox-232012/frontend
                                         resources:
                                             requests:
                                                 cpu: 100m
                                                 memory: 100Mi
                                         ports:
                                             -
-                                                containerPort: 3306
-                                        volumeMounts:
-                                            -
-                                                mountPath: /var/lib/mysql
-                                                name: db-volume
-                                volumes:
-                                    -
-                                        name: db-volume
-                                        gcePersistentDisk:
-                                            pdName: lb-demo-db
-                                            fsType: ext3
+                                                containerPort: 8080
             register: deployment
         -
             name: This is the deployment
             debug:
                 var: deployment
         -
-            name: Create a MariaDB service
+            name: Create a Frontend service
             k8s:
                 host: "https://{{ cluster.endpoint }}"
                 ca_cert: "{{ cluster.masterAuth.clusterCaCertificate }}"
@@ -90,57 +74,27 @@
                     apiVersion: v1
                     kind: Service
                     metadata:
-                        name: mariadb-service
+                        name: frontend-service
                         labels:
-                            app: mariadb
+                            app: "{{ app_name }}"
                             role: master
-                            tier: backend
+                            tier: frontend
                     spec:
                         type: LoadBalancer
                         #loadBalancerIP: "YOUR.IP.ADDRESS.HERE"
                         ports:
                         -
-                            port: 3306
-                            targetPort: 3306
+                            port: 8080
+                            targetPort: 8080
                         selector:
-                            app: mariadb
+                            app: "{{ app_name }}"
                             role: master
-                            tier: backend
+                            tier: frontend
             register: service
         -
             name: This is the service
             debug:
                 var: service
-        -
-            name: Check out the App sources
-            git:
-                repo: "{{ app_repo }}"
-                dest: "{{ app_name }}"
-                force: true
-        -
-            name: Modify the login source in the DB creation script
-            replace:
-                path: "{{ app_name }}/sql/00_create.sql"
-                regexp: "(?<=@')[1-9][^']*"
-                replace: "%"
-        -
-            name: Modify the user password in the DB creation script
-            replace:
-                path: "{{ app_name }}/sql/00_create.sql"
-                regexp: "(?<=IDENTIFIED BY ')[^']*"
-                replace: "{{ db_user_password }}"
-        -
-            name: Modify the DB server in the frontend config
-            replace:
-                path: "{{ app_name }}/config.json"
-                regexp: '(?<="db_server":)\s*".*?"'
-                replace: ' "mariadb-service"'
-        -
-            name: Modify the user password in the frontend config
-            replace:
-                path: "{{ app_name }}/config.json"
-                regexp: '(?<="db_password":)\s*".*?"'
-                replace: ' "{{ db_user_password }}"'
         -
             name: Wait for the service external IP
             k8s_facts:
@@ -150,26 +104,18 @@
                 api_key: "{{ gcloud_credentials.credential.access_token }}"
                 kind: Service
                 field_selectors:
-                    - metadata.name=mariadb-service
+                    - metadata.name=frontend-service
             register: services
             until: "services.resources[0].status.loadBalancer.ingress[0].ip is defined"
             retries: 90
             delay: 5
         -
             set_fact:
-                db_service_ip: "{{ services.resources[0].status.loadBalancer.ingress[0].ip }}"
+                frontend_service_ip: "{{ services.resources[0].status.loadBalancer.ingress[0].ip }}"
         -
-            name: This is the DB service IP
+            name: This is the Frontend service IP
             debug:
-                var: db_service_ip
-        -
-            name: Create the database structure
-            become: yes
-            shell: |
-                mysql -u root --password='{{ db_root_password }}' -h {{ db_service_ip }} < 00_create.sql
-                mysql -u test --password='{{ db_user_password }}' -h {{ db_service_ip }} < 01_add_data.sql
-            args:
-                chdir: "{{ app_name }}/sql"
+                var: frontend_service_ip
 
 
 # vim: set sw=4 ts=4 et indk= :

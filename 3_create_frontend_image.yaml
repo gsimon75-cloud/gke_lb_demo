@@ -9,13 +9,25 @@
         gcloud_credentials: "{{ gcloud_creds_text | json_query('@') }}"
     tags: create
     tasks:
+         # NOTE: re-building the image isn't working yet
+#        -
+#            name: Remove the (previous) frontend image
+#            become: true
+#            docker_image:
+#                name: "frontend:latest"
+#                source: local
+#                state: absent
         -
             name: Build the frontend image
             become: true
             docker_image:
                 name: "frontend:latest"
+                source: build
+                force_source: true
                 build:
+                    pull: true
                     path: "."
+                    rm: true
             register: frontend_image
         -
             name: This is the frontend image
