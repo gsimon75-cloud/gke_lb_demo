@@ -3,31 +3,26 @@
     vars_files:
         - external_vars.yaml
     vars:
-        service_account_content: "{{ lookup('file', gcp_cred_file) }}"
-        service_account_email: "{{ service_account_content | json_query('client_email') }}"
+        db_user_password: "{{ lookup('password', 'db.user.password') }}"
         gcloud_creds_text: "{{ lookup('pipe', 'gcloud config config-helper --format=json') }}"
         gcloud_credentials: "{{ gcloud_creds_text | json_query('@') }}"
     tags: create
     tasks:
-         # NOTE: re-building the image isn't working yet
-#        -
-#            name: Remove the (previous) frontend image
-#            become: true
-#            docker_image:
-#                name: "frontend:latest"
-#                source: local
-#                state: absent
         -
             name: Build the frontend image
             become: true
+            changed_when: true # force re-building the image, 'force_source' isn't enough
             docker_image:
                 name: "frontend:latest"
                 source: build
-                force_source: true
+                #force_source: true
                 build:
                     pull: true
-                    path: "."
                     rm: true
+                    path: "{{ app_name }}"
+                    args:
+                        DB_SERVER: "mariadb-service"
+                        DB_PASSWORD: "{{ db_user_password }}"
             register: frontend_image
         -
             name: This is the frontend image
@@ -50,12 +45,12 @@
             name: Tag and push the image to the container repo
             become: true
             docker_image:
-                name: "frontend:latest"
+                name: "frontend"
+                tag: "latest"
+                force_tag: true
+                push: true
                 repository: "{{ container_repo_server }}/{{ gcp_project_id }}/frontend"
                 source: local
-                push: true
-                build:
-                    push: true
         -
             name: Log out of container repo
             become: true

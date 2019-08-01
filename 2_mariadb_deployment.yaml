@@ -130,18 +130,6 @@
                 regexp: "(?<=IDENTIFIED BY ')[^']*"
                 replace: "{{ db_user_password }}"
         -
-            name: Modify the DB server in the frontend config
-            replace:
-                path: "{{ app_name }}/config.json"
-                regexp: '(?<="db_server":)\s*".*?"'
-                replace: ' "mariadb-service"'
-        -
-            name: Modify the user password in the frontend config
-            replace:
-                path: "{{ app_name }}/config.json"
-                regexp: '(?<="db_password":)\s*".*?"'
-                replace: ' "{{ db_user_password }}"'
-        -
             name: Wait for the service external IP
             k8s_facts:
                 host: "https://{{ cluster.endpoint }}"
