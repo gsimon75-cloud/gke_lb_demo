@@ -261,16 +261,27 @@ So, the process goes like this:
 6. Push the image: `docker push eu.gcr.io/networksandbox-232012/lb_demo_frontend`
 7. Logout: `sudo docker logout eu.gcr.io`
 
-This is done by `2_create_frontend_image.yaml`, and then its result can be checked: 
+This is done by `3_create_frontend_image.yaml`, and then its result can be checked: 
 
 `gcloud container images list --repository=eu.gcr.io/networksandbox-232012`
 
 
 ### Creating the frontend image
 
-TODO: do it from playbook
+The standalone docker command would be `sudo docker image build -t frontend:latest .`
 
-`sudo docker image build -t frontend:latest .`
+Of course, it can be integrated into our playbooks, so this is also in `3_create_frontend_image.yaml`.
+
+
+### Finally: deploying the webservers
+
+Having reached this point, no surprises are left. With the DB we already deployed nodes to the cluster
+(using an image), created service to make it available, and this step is even simpler (it needs no
+customisation of files, etc.) :
+
+`4_frontend_deployment.yaml`
+
+And now we have the cluster up and running, at full functionality :D !
 
 
 ## Misc notes
