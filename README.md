@@ -63,9 +63,9 @@ for us:
 * Configuring the cluster store, etc.
 * Registering the new instances as parts of the cluster
 
-All we need is to define the parameters of the images and of the cluster:
+All we need is to define the parameters of the instances and of the cluster:
 
-For the images:
+For the instances:
 
 * Machine type
 * Disk size
